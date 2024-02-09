@@ -49,7 +49,8 @@ class Object {
 
         this._position = position;
         this._color = "#FF0000";
-        this._radius = 15;
+
+        this.radius = 15;
     }
 
     update(){
@@ -63,20 +64,36 @@ class Object {
             ctx: canvasContext,
             x: gameCanvas.width / 2 + this._position[0],
             y: gameCanvas.height / 2 - this._position[1],
-            radius: this._radius,
+            radius: this.radius,
             fill: "#FF00FF",
         })
     }
     remove(){ this.isRemoved = true };
 }
 
+const checkCollision = (a, b) => {
+    const aP = a._position;
+    const bP = b._position;
+
+    const magnitude = Math.sqrt(
+        Math.pow(aP[0] - bP[0], 2) +
+        Math.pow(aP[1] - bP[1], 2)
+    )
+
+    return (magnitude - a.radius / 2 <= Math.max(a.radius, b.radius))
+};
+
 class Player {
     constructor(){
-        this._position = [0, 0];
+        this.speed = 10;
+        this.radius = 20;
+
+        this._position = Array(2, 0);
         this._gravity = 1;
         this._mode = 1;
         this._isJumping = false;
-        this.speed = 9;
+
+        this.pastLocations = [];
     }
 
     setJumping(state){ this._isJumping = state };
@@ -92,6 +109,12 @@ class Player {
 
         this._position[0] += x * this.speed;
         this._position[1] += y * this.speed;
+
+        if (this.pastLocations.length >= 100){
+            this.pastLocations.splice(1,1);
+        }
+
+        this.pastLocations.push([this._position[0], this._position[1]]);
     };
 
     async draw(canvasContext){
@@ -99,7 +122,7 @@ class Player {
             ctx: canvasContext,
             x: gameCanvas.width / 2 + this._position[0],
             y: gameCanvas.height / 2 - this._position[1],
-            radius: 20,
+            radius: this.radius,
             fill: "#00FFFF",
         })
     };
@@ -117,10 +140,35 @@ async function renderGame(){
     const canvasContext = gameCanvas.getContext("2d");
     canvasContext.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
 
+    objects.forEach(object => {
+        const collisionMade = checkCollision(gamePlayer, object);
+        if (collisionMade){
+            objects = [];
+            gamePlayer.setPosition(Array(2, 0));
+
+            let playerPosition = gamePlayer.getPosition();
+            let cameraPosition = gameCamera.getPosition();
+
+            gameCamera.setPosition([
+                lerp(cameraPosition[0], playerPosition[0], 0.4),
+                lerp(cameraPosition[1], playerPosition[1], 0.2),
+            ]);
+        };
+    })
+
+    gamePlayer.pastLocations.forEach(location => {
+        drawCircle({
+            ctx: canvasContext,
+            x: gameCanvas.width / 2 + location[0],
+            y: gameCanvas.height / 2 - location[1],
+            radius: gamePlayer.radius / 1.5,
+            fill: "#00FFFF",
+        })
+    });
+    
     gamePlayer.setJumping(heldKeys["ArrowUp"] || heldKeys["Space"]);
     gamePlayer.update();
-    gamePlayer.draw(canvasContext);
-
+    
     let playerPosition = gamePlayer.getPosition();
     let cameraPosition = gameCamera.getPosition();
 
@@ -140,8 +188,12 @@ async function renderGame(){
         object.update();
         object.draw(canvasContext);
 
-        if (object.isRemoved){ objects.splice(index, 1) };
+        if (object.isRemoved){ objects.splice(index, 1); return };
+
+        checkCollision(gamePlayer, object);
     })
+
+    gamePlayer.draw(canvasContext);
 
     requestAnimationFrame(renderGame);
 };
