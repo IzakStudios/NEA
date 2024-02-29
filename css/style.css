@@ -5,7 +5,7 @@ body {
 canvas {
     position: absolute;
     height: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: 16/9;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
